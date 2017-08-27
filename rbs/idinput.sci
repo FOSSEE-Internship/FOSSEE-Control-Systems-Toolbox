@@ -14,7 +14,7 @@ function[u]=idinput(N,types,band,levels)
     //N       : no of binary signals 
     //[n,nu]  : nu channel signal of length n.
     //[n,nu,m]: nu channel signal of length nxm and period m.
-    //type    : "rbs" 
+    //type    : "rbs" ,"prbs"
     //band    : frequency band of the signal.
     //levels  : binary output values
     
@@ -25,13 +25,14 @@ function[u]=idinput(N,types,band,levels)
     //u = idinput([n,nu,m]) returns an Nu-channel periodic random binary input signal with specified period and number of 
     //periods. Each input channel signal is of length m*n.
     //u=idinput(___,type) specifies the type of input to be generated:
-            //'rbs' — Random binary signal
+            //'rbs' — Random binary signal.
+            //'prbs'—pseudorandom binary signal. 
     //u =idinput(___,type,band) specifies the frequency band of the signal.
     //u =idinput(___,type,band,levels) specifies the level of the binary generated signal
 
     //   
     //Examples
-    //u=idinput([20,2,2],"rbs",[0 0.3],[-1 2]);
+    //u=idinput([20,2,2],'rbs',[0 0.3],[-1 2]);
     //
     
     //Author
@@ -123,9 +124,81 @@ function[u]=idinput(N,types,band,levels)
             u = (levels(2)-levels(1))*(u+1)/2+levels(1);
             
         end
-        
+    elseif convstr(types)=='prbs' then
+        clockP = floor(1/band(2));
+        possP = 2.^(3:18)-1;
+        P1 = max(possP(P/clockP-possP>=0));
+        if isempty(P1)
+            P1 = 7;
+        end
+        n = find(P1==possP)+2;
+   
+        if (clockP*P1~=P)
+            if M>1
+                warning(msprintf(gettext("%s: period of prbs signal changed to %d and length change to %d"),"idinput",clockP*P1,P1*M*clockP));
+                P = P1*clockP;
+            else
+                n = min(n+1,18);
+                P1 = 2^n -1;
+                warning(msprintf(gettext("%s :generated signal is first %d values of a sequence of length %d"),"idinput",P,clockP*P1));
+            end
+        end
+   
+        P1 = 2^n-1;
+   
+        if n<3 || n>18,
+            error(msprintf(gettext('Bad conditioning')));
+        end
+        fi = -ones(n,1);
+        if n==3
+            ind = [1,3];
+        elseif n==4
+            ind = [1,4];
+        elseif n==5
+            ind = [2,5];
+        elseif n==6
+            ind = [1,6];
+        elseif n==7
+            ind = [1,7];
+        elseif n==8
+            ind = [1,2,7,8];
+        elseif n==9
+            ind = [4,9];
+        elseif n==10
+            ind = [3,10];
+        elseif n==11
+            ind = [9,11];
+        elseif n==12
+            ind = [6,8,11,12];
+        elseif n==13
+            ind = [9,10,12,13];
+        elseif n==14
+            ind = [4,8,13,14];
+        elseif n==15
+            ind = [14,15];
+        elseif n==16
+            ind = [4,13,15,16];
+        elseif n==17
+            ind = [14,17];
+        elseif n==18
+            ind = [11,18];
+        end
+        for t = 1:clockP:P1*clockP
+            u(t:t+clockP-1,1) = ones(clockP,1)*fi(n); //LL%% multivariable !!
+            fi = [prod(fi(ind));fi(1:n-1,1)];
+        end
+        u = (levels(2)-levels(1))*(u+1)/2+levels(1);
+   
+        u = u(1:P,1);
+        if nu >1
+            u1 = [u;u];
+            shift = floor(P/nu);
+            for ku = 2:nu
+                u = [u,u1(shift*(ku-1)+1:P+shift*(ku-1))];
+            end
+        end
     else
-        error('type can be(rbs)only')
+        error(msprintf(gettext('type can be rbs or prbs only')));
     end
     if M>1 then              //generating periodic input if no. of periods>1
         uu = u;
